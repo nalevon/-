@@ -1,0 +1,1655 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Даю КБЖУ AI — дневник питания</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            darkBg: '#11161d',
+            darkCard: '#19202a',
+            darkBorder: '#26303d',
+            mint: '#1cc8a0',
+            mintDark: '#139a7b',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      transition: background-color 0.25s ease, color 0.25s ease;
+      user-select: none;
+    }
+    .mint-gradient {
+      background: linear-gradient(135deg, #22d3a8 0%, #159f80 100%);
+    }
+    .gauge-arc {
+      transition: stroke-dashoffset 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(156, 163, 175, 0.3);
+      border-radius: 9999px;
+    }
+    /* Стили барабанов */
+    .wheel-wrapper {
+      position: relative;
+      height: 176px;
+      border-radius: 20px;
+      overflow: hidden;
+      background: linear-gradient(180deg, rgba(15,20,27,0.95) 0%, rgba(28,37,49,0.5) 50%, rgba(15,20,27,0.95) 100%);
+      box-shadow: inset 0 8px 16px rgba(0,0,0,0.45), inset 0 -8px 16px rgba(0,0,0,0.45);
+    }
+    html:not(.dark) .wheel-wrapper {
+      background: linear-gradient(180deg, rgba(226,232,240,0.9) 0%, rgba(255,255,255,0.95) 50%, rgba(226,232,240,0.9) 100%);
+      box-shadow: inset 0 6px 12px rgba(15,23,42,0.12), inset 0 -6px 12px rgba(15,23,42,0.12);
+    }
+    .wheel-scroller {
+      height: 100%;
+      overflow-y: scroll;
+      scroll-snap-type: y mandatory;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      padding-top: 66px;
+      padding-bottom: 66px;
+      cursor: grab;
+      touch-action: pan-y;
+    }
+    .wheel-scroller::-webkit-scrollbar {
+      display: none;
+    }
+    .wheel-item {
+      height: 44px;
+      scroll-snap-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #64748b;
+      transition: transform 0.15s ease, color 0.15s ease, font-size 0.15s ease, opacity 0.15s ease;
+      opacity: 0.45;
+      transform: scale(0.88);
+    }
+    .wheel-item.active {
+      font-size: 1.45rem;
+      font-weight: 800;
+      color: #1cc8a0;
+      opacity: 1;
+      transform: scale(1.06);
+    }
+    .wheel-center-highlight {
+      position: absolute;
+      top: 50%;
+      left: 6px;
+      right: 6px;
+      height: 44px;
+      transform: translateY(-50%);
+      border-top: 1.5px solid rgba(28, 200, 160, 0.55);
+      border-bottom: 1.5px solid rgba(28, 200, 160, 0.55);
+      background: rgba(28, 200, 160, 0.08);
+      border-radius: 12px;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .wheel-notches {
+      position: absolute;
+      top: 12px;
+      bottom: 12px;
+      width: 4px;
+      pointer-events: none;
+      z-index: 3;
+      background-image: repeating-linear-gradient(
+        to bottom,
+        rgba(148, 163, 184, 0.28) 0px,
+        rgba(148, 163, 184, 0.28) 3px,
+        transparent 3px,
+        transparent 8px
+      );
+    }
+    .calendar-swipe-anim {
+      transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900 dark:bg-[#11161d] dark:text-white min-h-screen pb-14">
+
+  <div class="max-w-md mx-auto px-3.5 pt-4 space-y-4">
+
+    <!-- Верхняя панель -->
+    <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-1">
+      <div class="flex items-center gap-2.5">
+        <!-- Логотип-надпись -->
+        <div class="select-none" style="font-family:'Manrope','Inter',sans-serif;font-weight:800;line-height:.95;letter-spacing:-0.02em;">
+          <div class="text-[25px] text-slate-900 dark:text-white flex items-center">
+            <span>Да</span><span style="position:relative;display:inline-block;">ю<svg viewBox="0 0 24 24" style="position:absolute;left:47%;top:36%;width:.34em;height:.34em;" aria-hidden="true"><path d="M20 4C10 4 4 9.5 4 16c0 1.6.4 2.9 1 4 1.4-4.6 5.2-8.2 10-10-3.9 2.2-7 5.4-8.4 9.6C16.5 19.4 20 12.6 20 4z" fill="#4ade80"/></svg></span>
+          </div>
+          <div class="text-[25px] text-slate-900 dark:text-white mt-0.5">КБЖУ <span style="background:linear-gradient(135deg,#2cf0b0,#12c48f);-webkit-background-clip:text;background-clip:text;color:transparent;">AI</span></div>
+        </div>
+      </div>
+
+      <span id="aiBadgeHeader" onclick="openKeyModal()" class="cursor-pointer whitespace-nowrap text-[10px] font-bold px-2 py-0.5 rounded-full border bg-slate-500/15 text-slate-400 border-slate-500/30">
+        Добавьте ключ ИИ
+        </span>
+
+      <button onclick="openSettingsModal()" title="Настройки" aria-label="Настройки" class="justify-self-end w-10 h-10 rounded-2xl bg-white dark:bg-[#19202a] border border-emerald-500/40 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:border-[#1cc8a0] transition shadow-sm active:scale-95">
+        <svg class="w-5 h-5 text-[#1cc8a0]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Календарь недели -->
+    <div id="weekCalendarCard" class="rounded-[26px] bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] p-2.5 shadow-sm overflow-hidden select-none">
+      <div class="flex items-center justify-between px-2 pb-1.5 text-[11px] text-slate-400 font-semibold">
+        <button onclick="shiftWeek(-1)" class="px-1.5 py-0.5 rounded-lg hover:text-[#1cc8a0] transition" title="Предыдущая неделя">‹ Пред.</button>
+        <div class="flex items-center gap-2">
+          <span id="weekRangeLabel" class="text-slate-600 dark:text-slate-300 font-bold">12 окт – 18 окт</span>
+          <button id="resetTodayBtn" onclick="goToTodayWeek()" class="hidden text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-[#1cc8a0] font-bold">Сегодня</button>
+        </div>
+        <button onclick="shiftWeek(1)" class="px-1.5 py-0.5 rounded-lg hover:text-[#1cc8a0] transition" title="Следующая неделя">След. ›</button>
+      </div>
+      <div id="weekCalendar" class="grid grid-cols-7 gap-1 text-center calendar-swipe-anim touch-pan-y"></div>
+      <p class="text-[10px] text-center text-slate-400/70 mt-1">Смахните влево для следующей недели или вправо для предыдущей</p>
+    </div>
+
+    <!-- Визуализация КБЖУ -->
+    <div class="grid grid-cols-12 gap-3 items-stretch">
+      <div class="col-span-6 rounded-[28px] bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] p-3.5 flex flex-col items-center justify-between shadow-sm relative">
+        <div class="relative w-40 h-36 flex items-center justify-center mt-1">
+          <svg class="w-full h-full overflow-visible" viewBox="0 0 160 145">
+            <path d="M 28 122 A 62 62 0 1 1 132 122" fill="none" stroke="currentColor" class="text-slate-200 dark:text-[#2a3341]" stroke-width="11" stroke-linecap="round"/>
+            <path id="calorieArc" class="gauge-arc" d="M 28 122 A 62 62 0 1 1 132 122" fill="none" stroke="#1cc8a0" stroke-width="11" stroke-linecap="round" stroke-dasharray="278" stroke-dashoffset="278"/>
+          </svg>
+          <div class="absolute inset-0 flex flex-col items-center justify-center pt-2 text-center">
+            <svg class="w-5 h-5 text-[#1cc8a0] mb-0.5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12.96 2.32a.75.75 0 0 0-1.29.47c-.15 2.38-1.33 4.02-2.57 5.45-1.3 1.5-2.6 2.86-2.6 5.26a6.5 6.5 0 0 0 13 0c0-3.25-1.94-5.73-3.53-7.18a.75.75 0 0 0-1.24.67c.08 1.24-.42 2.13-1.08 2.6-.32-2.76-1.45-5.13-2.69-7.27Z"/>
+            </svg>
+            <span id="calStatusLabel" class="text-[10px] font-medium text-slate-400 leading-tight">Еще можно съесть</span>
+            <span id="calRemainingValue" class="text-3xl font-extrabold text-[#1cc8a0] tracking-tight my-0.5">2311</span>
+            <span class="text-xs font-semibold text-[#1cc8a0]">ккал</span>
+          </div>
+        </div>
+        <div class="w-full mt-1">
+          <div class="mint-gradient text-white font-bold text-xs py-2 px-3 rounded-full text-center shadow-md shadow-emerald-500/20">
+            <span id="calConsumedBadge">0 / 2311 ккал</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-span-6 flex flex-col justify-between gap-2.5">
+        <div class="rounded-[22px] bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] px-3 py-2.5 flex items-center gap-2.5 shadow-sm">
+          <div class="w-9 h-9 rounded-full bg-rose-500/15 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4 text-rose-300" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6.5 6.5l11 11M4 9l5-5m11 11l-5 5M2 7l5-5m15 15l-5 5"/></svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-baseline justify-between gap-1">
+              <span class="text-xs font-bold text-slate-700 dark:text-slate-200">Белки</span>
+              <span id="proteinText" class="text-[11px] font-semibold text-slate-500 dark:text-slate-300">0 / 144г</span>
+            </div>
+            <div class="w-full h-1.5 bg-slate-200 dark:bg-[#2a3341] rounded-full overflow-hidden mt-1.5">
+              <div id="proteinBar" class="h-full bg-rose-400 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-[22px] bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] px-3 py-2.5 flex items-center gap-2.5 shadow-sm">
+          <div class="w-9 h-9 rounded-full bg-sky-500/15 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4 text-sky-300" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-baseline justify-between gap-1">
+              <span class="text-xs font-bold text-slate-700 dark:text-slate-200">Жиры</span>
+              <span id="fatText" class="text-[11px] font-semibold text-slate-500 dark:text-slate-300">0 / 64г</span>
+            </div>
+            <div class="w-full h-1.5 bg-slate-200 dark:bg-[#2a3341] rounded-full overflow-hidden mt-1.5">
+              <div id="fatBar" class="h-full bg-sky-400 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-[22px] bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] px-3 py-2.5 flex items-center gap-2.5 shadow-sm">
+          <div class="w-9 h-9 rounded-full bg-amber-500/15 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4 text-amber-300" fill="currentColor" viewBox="0 0 24 24"><circle cx="8" cy="8" r="2"/><circle cx="16" cy="8" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-baseline justify-between gap-1">
+              <span class="text-xs font-bold text-slate-700 dark:text-slate-200">Углеводы</span>
+              <span id="carbsText" class="text-[11px] font-semibold text-slate-500 dark:text-slate-300">0 / 289г</span>
+            </div>
+            <div class="w-full h-1.5 bg-slate-200 dark:bg-[#2a3341] rounded-full overflow-hidden mt-1.5">
+              <div id="carbsBar" class="h-full bg-amber-400 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-[22px] bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] px-3 py-2.5 flex items-center gap-2.5 shadow-sm">
+          <div class="w-9 h-9 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4 text-[#1cc8a0]" fill="currentColor" viewBox="0 0 24 24"><path d="M17 8C8 10 5.9 16.17 3.82 21.34l1.89.66l.95-2.3c.48.17.98.3 1.34.3C19 20 22 3 22 3c-1 2-8 2.25-13 3.25S2 11.5 2 13.5s1.75 3.75 1.75 3.75C7 8 17 8 17 8Z"/></svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-baseline justify-between gap-1">
+              <span class="text-xs font-bold text-slate-700 dark:text-slate-200">Клетчатка</span>
+              <span id="fiberText" class="text-[11px] font-semibold text-slate-500 dark:text-slate-300">0 / 34г</span>
+            </div>
+            <div class="w-full h-1.5 bg-slate-200 dark:bg-[#2a3341] rounded-full overflow-hidden mt-1.5">
+              <div id="fiberBar" class="h-full bg-[#1cc8a0] rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- СЕКЦИЯ ДОБАВЛЕНИЯ БЛЮДА: ЧЕТЫРЕ КНОПКИ В РЯД -->
+    <div class="pt-1 space-y-3">
+      <h2 class="text-xl font-extrabold tracking-tight text-center">Добавление блюда</h2>
+
+      <!-- Четыре прямоугольника: Из ранее добавленных, Открыть камеру, Открыть галерею, Описать вручную -->
+      <div class="grid grid-cols-4 gap-2">
+        
+        <!-- 1. Из ранее добавленных (самый левый) -->
+        <div onclick="openHistoryModal()" class="rounded-[20px] bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] hover:border-[#1cc8a0] p-2.5 flex flex-col items-center justify-center text-center shadow-sm cursor-pointer active:scale-95 transition group">
+          <div class="w-9 h-9 rounded-full mint-gradient text-white flex items-center justify-center text-lg font-medium shadow-md mb-1.5 group-hover:scale-105 transition">
+            🕘
+          </div>
+          <h3 class="text-[10px] font-extrabold text-[#1cc8a0] leading-tight">Из ранее добавленных</h3>
+          <p class="text-[8px] text-slate-400 mt-0.5">История</p>
+        </div>
+
+        <!-- 2. Открыть камеру (Прямой вызов) -->
+        <div onclick="triggerDirectCamera()" class="rounded-[20px] bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] hover:border-[#1cc8a0] p-2.5 flex flex-col items-center justify-center text-center shadow-sm cursor-pointer active:scale-95 transition group">
+          <div class="w-9 h-9 rounded-full mint-gradient text-white flex items-center justify-center text-lg font-medium shadow-md mb-1.5 group-hover:scale-105 transition">
+            📷
+          </div>
+          <h3 class="text-[10px] font-extrabold text-[#1cc8a0] leading-tight">Открыть камеру</h3>
+          <p class="text-[8px] text-slate-400 mt-0.5">AI фото</p>
+        </div>
+
+        <!-- 3. Открыть галерею (Прямой вызов) -->
+        <div onclick="triggerDirectGallery()" class="rounded-[20px] bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] hover:border-[#1cc8a0] p-2.5 flex flex-col items-center justify-center text-center shadow-sm cursor-pointer active:scale-95 transition group">
+          <div class="w-9 h-9 rounded-full mint-gradient text-white flex items-center justify-center text-lg font-medium shadow-md mb-1.5 group-hover:scale-105 transition">
+            🖼️
+          </div>
+          <h3 class="text-[10px] font-extrabold text-[#1cc8a0] leading-tight">Открыть галерею</h3>
+          <p class="text-[8px] text-slate-400 mt-0.5">Из памяти</p>
+        </div>
+
+        <!-- 4. Описать вручную -->
+        <div onclick="toggleManualTextField()" class="rounded-[20px] bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] hover:border-[#1cc8a0] p-2.5 flex flex-col items-center justify-center text-center shadow-sm cursor-pointer active:scale-95 transition group">
+          <div class="w-9 h-9 rounded-full mint-gradient text-white flex items-center justify-center text-lg font-medium shadow-md mb-1.5 group-hover:scale-105 transition">
+            ✍️
+          </div>
+          <h3 class="text-[10px] font-extrabold text-[#1cc8a0] leading-tight">Описать вручную</h3>
+          <p class="text-[8px] text-slate-400 mt-0.5">AI текст</p>
+        </div>
+
+      </div>
+
+      <!-- ИНДИКАТОР АКТИВНОГО AI-АНАЛИЗА -->
+      <div id="aiProcessingBanner" class="hidden rounded-[22px] bg-emerald-500/10 border border-emerald-500/30 p-3.5 flex items-center justify-between gap-3 shadow-sm">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-5 h-5 border-2 border-[#1cc8a0] border-t-transparent rounded-full animate-spin shrink-0"></div>
+          <span id="aiProcessingText" class="text-xs font-bold text-[#1cc8a0] truncate">ИИ анализирует...</span>
+        </div>
+      </div>
+
+      <!-- СКРЫТОЕ ПОЛЕ ДЛЯ ТЕКСТОВОГО ОПИСАНИЯ БЛЮДА (БЕЗ НИКАКИХ ГРАФИКОВ И ЦИФР) -->
+      <div id="manualTextPromptCard" class="hidden rounded-[24px] bg-white dark:bg-[#19202a] border border-emerald-500/40 p-3.5 space-y-2.5 shadow-md">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-base">✍️</span>
+            <span class="text-xs font-extrabold text-slate-800 dark:text-slate-200">Опишите блюдо текстом для ИИ</span>
+          </div>
+          <button onclick="toggleManualTextField()" class="text-xs text-slate-400 font-bold hover:text-rose-400">✕ Закрыть</button>
+        </div>
+        <textarea id="aiTextPromptInput" rows="2" placeholder="Например: Банка сгущенки и 2 пряника..." class="w-full p-2.5 rounded-xl bg-slate-100 dark:bg-[#11161d] border border-slate-200 dark:border-[#26303d] text-xs focus:outline-none focus:border-[#1cc8a0] resize-none"></textarea>
+        <button id="submitTextAiBtn" onclick="submitTextPromptToAI()" class="w-full py-2.5 rounded-xl mint-gradient text-white text-xs font-extrabold shadow-md active:scale-98 transition flex items-center justify-center gap-1.5">
+          <span>🚀 Распознать ИИ и добавить в дневник</span>
+        </button>
+      </div>
+
+      <!-- СПИСОК ДОБАВЛЕННОЙ ЕДЫ -->
+      <div id="foodListContainer" class="space-y-2.5 pt-1"></div>
+    </div>
+
+    <!-- КАРТОЧКА ВОДЫ -->
+    <div class="rounded-[26px] bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] p-4 shadow-sm space-y-3">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3.5">
+          <div class="w-14 h-14 rounded-2xl bg-sky-500/15 border border-sky-500/20 flex items-center justify-center text-2xl shrink-0">💧</div>
+          <div>
+            <h3 class="text-lg font-extrabold text-sky-400 leading-snug">Вода</h3>
+            <p id="waterGoalLabel" class="text-xs text-slate-500 dark:text-slate-400">Цель: 2400 мл</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="changeWater(-250)" class="w-9 h-9 rounded-full bg-slate-200 dark:bg-[#253040] text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold active:scale-90 transition">−</button>
+          <button onclick="changeWater(250)" class="w-11 h-11 rounded-full bg-sky-400/80 hover:bg-sky-400 text-slate-950 flex items-center justify-center font-bold shadow-md shadow-sky-500/20 active:scale-90 transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14"/></svg>
+          </button>
+        </div>
+      </div>
+      <div>
+        <div class="flex justify-between text-xs font-bold text-sky-400 mb-1.5">
+          <span id="waterCurrentText">0 мл</span>
+          <span id="waterPercentText">0%</span>
+        </div>
+        <div class="w-full h-2 bg-slate-200 dark:bg-[#2a3341] rounded-full overflow-hidden">
+          <div id="waterProgressBar" class="h-full bg-sky-400 rounded-full transition-all duration-500" style="width: 0%"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- СКРЫТЫЕ ИНПУТЫ ДЛЯ КАМЕРЫ И ГАЛЕРЕИ -->
+  <input id="directCameraInput" type="file" accept="image/*" capture="environment" class="hidden" onchange="handleImageFileSelected(event)" />
+  <input id="directGalleryInput" type="file" accept="image/*" class="hidden" onchange="handleImageFileSelected(event)" />
+
+  <!-- МОДАЛЬНОЕ ОКНО: ИЗ РАНЕЕ ДОБАВЛЕННЫХ -->
+  <div id="historyModal" class="fixed inset-0 z-50 hidden bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="w-full max-w-md bg-white dark:bg-[#19202a] border-t sm:border border-slate-200 dark:border-[#26303d] rounded-t-[30px] sm:rounded-[30px] p-4 max-h-[88vh] flex flex-col space-y-3 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">🕘</span>
+          <h3 class="text-lg font-extrabold">Из ранее добавленных</h3>
+        </div>
+        <button onclick="closeHistoryModal()" class="w-8 h-8 rounded-full bg-slate-200 dark:bg-[#253040] flex items-center justify-center text-slate-500 dark:text-slate-300 font-bold">✕</button>
+      </div>
+
+      <input id="historySearchInput" type="text" oninput="renderHistoryModalList()" placeholder="Поиск по ранее добавленным блюдам..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-[#11161d] border border-slate-200 dark:border-[#26303d] text-xs focus:outline-none focus:border-[#1cc8a0]" />
+
+      <div id="historyListContainer" class="overflow-y-auto custom-scroll space-y-2 pr-1 max-h-80"></div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО РЕДАКТИРОВАНИЯ БЛЮДА -->
+  <div id="editFoodModal" class="fixed inset-0 z-50 hidden bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="w-full max-w-md bg-white dark:bg-[#19202a] border-t sm:border border-slate-200 dark:border-[#26303d] rounded-t-[30px] sm:rounded-[30px] p-4 max-h-[92vh] overflow-y-auto custom-scroll space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-extrabold">Редактировать блюдо</h3>
+        <button onclick="closeEditFoodModal()" class="w-8 h-8 rounded-full bg-slate-200 dark:bg-[#253040] flex items-center justify-center text-slate-500 dark:text-slate-300 font-bold">✕</button>
+      </div>
+
+      <div class="rounded-2xl bg-slate-100 dark:bg-[#11161d] p-3.5 space-y-3 border border-slate-200 dark:border-[#26303d]">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-extrabold text-slate-600 dark:text-slate-300">Данные блюда</span>
+          <button onclick="recalcCaloriesFromMacros()" class="text-[11px] text-[#1cc8a0] font-bold hover:underline">Авто-ккал из БЖУ</button>
+        </div>
+
+        <div class="grid grid-cols-12 gap-2">
+          <div class="col-span-8">
+            <label class="text-[10px] font-semibold text-slate-400">Название блюда</label>
+            <input id="editFoodNameInput" type="text" class="w-full mt-0.5 px-3 py-2 rounded-xl bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] text-xs font-semibold focus:outline-none focus:border-[#1cc8a0]" />
+          </div>
+          <div class="col-span-4">
+            <label class="text-[10px] font-semibold text-slate-400">Вес (г)</label>
+            <input id="editFoodWeightInput" type="number" min="1" oninput="scaleEditMacrosByWeight()" class="w-full mt-0.5 px-2.5 py-2 rounded-xl bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] text-xs font-bold text-center focus:outline-none focus:border-[#1cc8a0]" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-5 gap-1.5 text-center">
+          <div>
+            <label class="text-[10px] font-bold text-[#1cc8a0]">Ккал</label>
+            <input id="editFoodCalInput" type="number" min="0" class="w-full mt-0.5 py-1.5 rounded-xl bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] text-xs font-extrabold text-center" />
+          </div>
+          <div>
+            <label class="text-[10px] font-bold text-rose-400">Белки</label>
+            <input id="editFoodProtInput" type="number" step="0.1" min="0" oninput="recalcCaloriesFromMacros()" class="w-full mt-0.5 py-1.5 rounded-xl bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] text-xs font-bold text-center" />
+          </div>
+          <div>
+            <label class="text-[10px] font-bold text-sky-400">Жиры</label>
+            <input id="editFoodFatInput" type="number" step="0.1" min="0" oninput="recalcCaloriesFromMacros()" class="w-full mt-0.5 py-1.5 rounded-xl bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] text-xs font-bold text-center" />
+          </div>
+          <div>
+            <label class="text-[10px] font-bold text-amber-400">Углев.</label>
+            <input id="editFoodCarbInput" type="number" step="0.1" min="0" oninput="recalcCaloriesFromMacros()" class="w-full mt-0.5 py-1.5 rounded-xl bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] text-xs font-bold text-center" />
+          </div>
+          <div>
+            <label class="text-[10px] font-bold text-emerald-400">Клетч.</label>
+            <input id="editFoodFiberInput" type="number" step="0.1" min="0" class="w-full mt-0.5 py-1.5 rounded-xl bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] text-xs font-bold text-center" />
+          </div>
+        </div>
+
+        <button onclick="saveEditedFoodEntry()" class="w-full py-3 rounded-2xl mint-gradient text-white font-extrabold text-sm shadow-lg shadow-emerald-500/25 active:scale-98 transition">
+          ✓ Сохранить изменения
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО НАСТРОЕК -->
+  <div id="settingsModal" class="fixed inset-0 z-50 hidden bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="w-full max-w-md bg-white dark:bg-[#19202a] border-t sm:border border-slate-200 dark:border-[#26303d] rounded-t-[30px] sm:rounded-[30px] p-4 max-h-[92vh] overflow-y-auto custom-scroll space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">⚙️</span>
+          <h3 class="text-lg font-extrabold">Параметры и ИИ</h3>
+        </div>
+        <button onclick="closeSettingsModal()" class="w-8 h-8 rounded-full bg-slate-200 dark:bg-[#253040] flex items-center justify-center text-slate-500 dark:text-slate-300 font-bold">✕</button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div class="rounded-2xl bg-slate-100 dark:bg-[#11161d] p-1 flex text-xs font-bold">
+          <button id="genderMaleBtn" onclick="setGender('male')" class="flex-1 py-2 rounded-xl transition">👨 Мужчина</button>
+          <button id="genderFemaleBtn" onclick="setGender('female')" class="flex-1 py-2 rounded-xl transition">👩 Женщина</button>
+        </div>
+        <button onclick="toggleTheme()" class="rounded-2xl bg-slate-100 dark:bg-[#11161d] border border-slate-200 dark:border-[#26303d] px-3 py-2 text-xs font-bold flex items-center justify-center gap-2">
+          <span>🌗</span> <span id="themeToggleLabel">Тёмная тема</span>
+        </button>
+      </div>
+
+      <div class="space-y-1.5">
+        <div class="grid grid-cols-3 gap-2.5">
+          <div>
+            <p class="text-[11px] font-bold text-center text-slate-400 mb-1">Рост (см)</p>
+            <div class="wheel-wrapper">
+              <div class="wheel-notches left-1.5"></div>
+              <div class="wheel-notches right-1.5"></div>
+              <div class="wheel-center-highlight"></div>
+              <div id="wheelHeight" class="wheel-scroller"></div>
+            </div>
+          </div>
+          <div>
+            <p class="text-[11px] font-bold text-center text-slate-400 mb-1">Вес (кг)</p>
+            <div class="wheel-wrapper">
+              <div class="wheel-notches left-1.5"></div>
+              <div class="wheel-notches right-1.5"></div>
+              <div class="wheel-center-highlight"></div>
+              <div id="wheelWeight" class="wheel-scroller"></div>
+            </div>
+          </div>
+          <div>
+            <p class="text-[11px] font-bold text-center text-slate-400 mb-1">Возраст</p>
+            <div class="wheel-wrapper">
+              <div class="wheel-notches left-1.5"></div>
+              <div class="wheel-notches right-1.5"></div>
+              <div class="wheel-center-highlight"></div>
+              <div id="wheelAge" class="wheel-scroller"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2.5">
+        <div>
+          <label class="text-[11px] font-bold text-slate-400">Активность</label>
+          <select id="activitySelect" onchange="recalculateRecommendedGoals()" class="w-full mt-1 px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-[#11161d] border border-slate-200 dark:border-[#26303d] text-xs font-bold">
+            <option value="1.2">Сидячий образ (1.2)</option>
+            <option value="1.375">Лёгкая (1.38)</option>
+            <option value="1.55" selected>Средняя (1.55)</option>
+            <option value="1.725">Высокая (1.73)</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-[11px] font-bold text-slate-400">Цель</label>
+          <select id="goalModeSelect" onchange="recalculateRecommendedGoals()" class="w-full mt-1 px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-[#11161d] border border-slate-200 dark:border-[#26303d] text-xs font-bold">
+            <option value="-0.15">Похудение (−15%)</option>
+            <option value="0" selected>Поддержание</option>
+            <option value="0.15">Набор массы (+15%)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="rounded-2xl bg-slate-100 dark:bg-[#11161d] p-3 space-y-2 border border-slate-200 dark:border-[#26303d]">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-extrabold">Суточная норма КБЖУ</span>
+          <button onclick="recalculateRecommendedGoals()" class="text-[11px] font-bold text-[#1cc8a0] hover:underline">Авторасчёт</button>
+        </div>
+        <div class="grid grid-cols-5 gap-1.5 text-center">
+          <div>
+            <label class="text-[10px] font-bold text-[#1cc8a0]">Ккал</label>
+            <input id="goalCalInput" type="number" class="w-full mt-0.5 py-1.5 rounded-lg bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] text-xs font-extrabold text-center" />
+          </div>
+          <div>
+            <label class="text-[10px] font-bold text-rose-400">Белки</label>
+            <input id="goalProtInput" type="number" class="w-full mt-0.5 py-1.5 rounded-lg bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] text-xs font-bold text-center" />
+          </div>
+          <div>
+            <label class="text-[10px] font-bold text-sky-400">Жиры</label>
+            <input id="goalFatInput" type="number" class="w-full mt-0.5 py-1.5 rounded-lg bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] text-xs font-bold text-center" />
+          </div>
+          <div>
+            <label class="text-[10px] font-bold text-amber-400">Углев.</label>
+            <input id="goalCarbInput" type="number" class="w-full mt-0.5 py-1.5 rounded-lg bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] text-xs font-bold text-center" />
+          </div>
+          <div>
+            <label class="text-[10px] font-bold text-sky-300">Вода</label>
+            <input id="goalWaterInput" type="number" class="w-full mt-0.5 py-1.5 rounded-lg bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] text-xs font-bold text-center" />
+          </div>
+        </div>
+      </div>
+
+      <button onclick="saveSettings()" class="w-full py-3 rounded-2xl mint-gradient text-white font-extrabold text-sm shadow-lg shadow-emerald-500/25 active:scale-98 transition">
+        Сохранить настройки
+      </button>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО КЛЮЧА ИИ -->
+  <div id="keyModal" class="fixed inset-0 z-50 hidden bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="w-full max-w-md bg-white dark:bg-[#19202a] border-t sm:border border-slate-200 dark:border-[#26303d] rounded-t-[30px] sm:rounded-[30px] p-4 max-h-[92vh] overflow-y-auto custom-scroll space-y-3.5 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">🔑</span>
+          <h3 class="text-lg font-extrabold">Ключ ИИ</h3>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="toggleKeyHelp()" title="Как получить ключ" aria-label="Как получить ключ" class="w-8 h-8 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[#1cc8a0] flex items-center justify-center font-extrabold text-sm">?</button>
+          <button onclick="closeKeyModal()" class="w-8 h-8 rounded-full bg-slate-200 dark:bg-[#253040] flex items-center justify-center text-slate-500 dark:text-slate-300 font-bold">✕</button>
+        </div>
+      </div>
+
+      <p class="text-xs text-slate-500 dark:text-slate-400">Ключ Gemini API нужен, чтобы ИИ распознавал еду по фото и описанию. Нажмите «?», если ещё нет ключа.</p>
+
+      <div id="keyHelpBox" class="hidden rounded-2xl bg-slate-100 dark:bg-[#11161d] border border-slate-200 dark:border-[#26303d] p-3 text-xs space-y-2 leading-relaxed">
+        <p class="font-extrabold text-sm">Как получить ключ (1–2 минуты)</p>
+        <ol class="list-decimal pl-4 space-y-1.5">
+          <li>Откройте <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" class="text-[#1cc8a0] font-bold underline">aistudio.google.com/apikey</a>.</li>
+          <li>Войдите в свой аккаунт Google (Gmail).</li>
+          <li>Нажмите <b>Create API key</b> («Создать ключ API»). Если спросят проект, выберите <b>Create API key in new project</b>.</li>
+          <li>Скопируйте появившийся ключ, он обычно начинается с <b>AIza…</b>.</li>
+          <li>Вернитесь сюда, вставьте ключ в поле ниже и нажмите «Сохранить ключ».</li>
+        </ol>
+        <div class="rounded-xl bg-amber-500/10 border border-amber-500/30 p-2 text-[11px] text-amber-600 dark:text-amber-300">
+          В России сайт Google AI Studio открывается только через VPN, но он нужен лишь один раз, чтобы получить ключ.
+        </div>
+        <p class="text-[11px] text-slate-500 dark:text-slate-400">Ключ хранится только в вашем браузере. Никому его не передавайте. У бесплатного ключа есть лимиты запросов в минуту и в сутки. Названия кнопок на сайте Google могут немного отличаться.</p>
+      </div>
+
+      <div class="space-y-1.5">
+        <label class="text-xs font-extrabold">Ваш ключ Gemini API</label>
+        <div class="relative">
+          <input id="geminiKeyInput" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="AIzaSy..." class="w-full pl-3 pr-11 py-2.5 rounded-xl bg-white dark:bg-[#11161d] border border-slate-200 dark:border-[#26303d] text-xs focus:outline-none focus:border-[#1cc8a0]" />
+          <button onclick="toggleKeyVisibility()" id="keyEyeBtn" aria-label="Показать ключ" class="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg text-slate-400 text-base">👁</button>
+        </div>
+      </div>
+
+      <button onclick="saveGeminiKey()" class="w-full py-3 rounded-2xl mint-gradient text-white font-extrabold text-sm shadow-lg shadow-emerald-500/25 active:scale-98 transition">
+        Сохранить ключ
+      </button>
+      <button id="keyDeleteBtn" onclick="deleteGeminiKey()" class="hidden w-full py-2.5 rounded-2xl border border-rose-500/40 text-rose-400 font-bold text-xs">
+        Удалить ключ с этого устройства
+      </button>
+    </div>
+  </div>
+
+  <div id="toastNotification" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-opacity duration-300 px-4 py-2.5 rounded-2xl bg-slate-900/95 text-white border border-emerald-500/40 text-xs font-bold shadow-xl">
+    Сохранено
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'nutritrack_state_v9';
+
+    const DEFAULT_FOOD_CATALOG = [
+      { name: 'Куриная грудка запечённая', icon: '🍗', weight: 150, cal: 248, p: 46.5, f: 5.4, c: 0, fiber: 0 },
+      { name: 'Овсяная каша на молоке', icon: '🥣', weight: 250, cal: 255, p: 8.0, f: 5.5, c: 42.5, fiber: 3.8 },
+      { name: 'Яйца варёные (2 шт)', icon: '🥚', weight: 110, cal: 170, p: 13.8, f: 11.5, c: 0.8, fiber: 0 },
+      { name: 'Творог 5%', icon: '🧀', weight: 180, cal: 218, p: 30.9, f: 9.0, c: 3.2, fiber: 0 },
+      { name: 'Гречка отварная', icon: '🍲', weight: 180, cal: 198, p: 6.8, f: 2.0, c: 38.0, fiber: 4.9 },
+      { name: 'Банан средний', icon: '🍌', weight: 120, cal: 107, p: 1.3, f: 0.4, c: 27.4, fiber: 3.1 },
+      { name: 'Салат Цезарь с курицей', icon: '🥗', weight: 220, cal: 365, p: 24.0, f: 22.0, c: 16.0, fiber: 2.8 }
+    ];
+
+    function getFoodDefaultEmoji(name = '') {
+      const n = name.toLowerCase();
+      if (n.includes('кур') || n.includes('индейк') || n.includes('мяс') || n.includes('котлет')) return '🍗';
+      if (n.includes('рыб') || n.includes('лосос')) return '🍣';
+      if (n.includes('яйц') || n.includes('омлет')) return '🥚';
+      if (n.includes('салат') || n.includes('овощ')) return '🥗';
+      if (n.includes('каш') || n.includes('овсян') || n.includes('греч') || n.includes('рис')) return '🥣';
+      if (n.includes('кофе') || n.includes('капуч')) return '☕';
+      if (n.includes('банан') || n.includes('яблок') || n.includes('фрукт')) return '🍎';
+      if (n.includes('сгущенк') || n.includes('сладост') || n.includes('пряник') || n.includes('барни') || n.includes('шоколад')) return '🍫';
+      return '🍽️';
+    }
+
+    function formatDateKey(dateObj) {
+      const y = dateObj.getFullYear();
+      const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const d = String(dateObj.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    let activeDateKey = formatDateKey(new Date());
+    let weekOffset = 0;
+
+    let appState = {
+      theme: 'dark',
+      profile: { gender: 'male', height: 178, weight: 75, age: 26, activity: 1.55, goalMod: 0 },
+      goals: { cal: 2311, p: 144, f: 64, c: 289, fiber: 34, water: 2400 },
+      geminiKey: '',
+      days: {},
+      history: [...DEFAULT_FOOD_CATALOG]
+    };
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          appState = {
+            ...appState,
+            ...parsed,
+            profile: { ...appState.profile, ...(parsed.profile || {}) },
+            goals: { ...appState.goals, ...(parsed.goals || {}) },
+            days: parsed.days || {},
+            history: (parsed.history && parsed.history.length) ? parsed.history : [...DEFAULT_FOOD_CATALOG]
+          };
+        }
+      } catch (e) {
+        console.warn('Load error:', e);
+      }
+      pruneOldThumbnails();
+      saveState();
+      applyTheme();
+      updateAiBadge();
+    }
+
+    const THUMB_KEEP_DAYS = 30;
+
+    // Удаляет миниатюры у записей старше THUMB_KEEP_DAYS дней (сами записи КБЖУ остаются)
+    function pruneOldThumbnails() {
+      const cutoff = new Date();
+      cutoff.setHours(0, 0, 0, 0);
+      cutoff.setDate(cutoff.getDate() - THUMB_KEEP_DAYS);
+      const cutoffMs = cutoff.getTime();
+
+      Object.keys(appState.days || {}).forEach(key => {
+        const p = key.split('-');
+        const dayMs = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10)).getTime();
+        if (isNaN(dayMs) || dayMs >= cutoffMs) return;
+        ((appState.days[key] && appState.days[key].foods) || []).forEach(f => {
+          if (f.image) f.image = null;
+        });
+      });
+
+      (appState.history || []).forEach(h => {
+        if (h.image && h.timestamp && h.timestamp < cutoffMs) h.image = null;
+      });
+    }
+
+    function saveState() {
+      pruneOldThumbnails();
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+      } catch (e) {
+        console.warn('Save error:', e);
+        showToast('⚠️ Память приложения переполнена — данные не сохранены. Очистите старые записи.');
+      }
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toastNotification');
+      toast.textContent = msg;
+      toast.classList.remove('opacity-0');
+      toast.classList.add('opacity-100');
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => {
+        toast.classList.remove('opacity-100');
+        toast.classList.add('opacity-0');
+      }, 2500);
+    }
+
+    const DAY_NAMES_SHORT = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
+    const MONTH_NAMES_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+
+    function getMondayOfOffsetWeek(offsetWeeks) {
+      const now = new Date();
+      const dayOfWeek = (now.getDay() + 6) % 7;
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - dayOfWeek + offsetWeeks * 7);
+      monday.setHours(0, 0, 0, 0);
+      return monday;
+    }
+
+    function renderWeekCalendar() {
+      const container = document.getElementById('weekCalendar');
+      const rangeLabel = document.getElementById('weekRangeLabel');
+      const resetBtn = document.getElementById('resetTodayBtn');
+
+      const monday = getMondayOfOffsetWeek(weekOffset);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+
+      rangeLabel.textContent = `${monday.getDate()} ${MONTH_NAMES_SHORT[monday.getMonth()]} – ${sunday.getDate()} ${MONTH_NAMES_SHORT[sunday.getMonth()]}`;
+      const todayKey = formatDateKey(new Date());
+
+      if (weekOffset !== 0 || activeDateKey !== todayKey) {
+        resetBtn.classList.remove('hidden');
+      } else {
+        resetBtn.classList.add('hidden');
+      }
+
+      container.innerHTML = '';
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        const key = formatDateKey(d);
+        const isSelected = key === activeDateKey;
+        const isToday = key === todayKey;
+        const hasFood = appState.days[key] && appState.days[key].foods && appState.days[key].foods.length > 0;
+
+        const btn = document.createElement('button');
+        btn.onclick = () => selectDate(key);
+        btn.className = `py-2 rounded-2xl flex flex-col items-center justify-center transition relative ${
+          isSelected
+            ? 'mint-gradient text-white shadow-md shadow-emerald-500/25 font-extrabold scale-105'
+            : isToday
+              ? 'bg-emerald-500/10 text-[#1cc8a0] border border-emerald-500/30 font-bold'
+              : 'hover:bg-slate-100 dark:hover:bg-[#232d3b] text-slate-600 dark:text-slate-300'
+        }`;
+
+        btn.innerHTML = `
+          <span class="text-[10px] opacity-80">${DAY_NAMES_SHORT[i]}</span>
+          <span class="text-sm font-extrabold mt-0.5">${d.getDate()}</span>
+          <span class="w-1.5 h-1.5 rounded-full mt-1 ${hasFood ? (isSelected ? 'bg-white' : 'bg-[#1cc8a0]') : 'bg-transparent'}"></span>
+        `;
+        container.appendChild(btn);
+      }
+    }
+
+    function selectDate(dateKey) {
+      activeDateKey = dateKey;
+      renderWeekCalendar();
+      renderDashboard();
+    }
+
+    function shiftWeek(direction) {
+      const cal = document.getElementById('weekCalendar');
+      cal.style.transform = `translateX(${direction > 0 ? '-18px' : '18px'})`;
+      cal.style.opacity = '0.4';
+      setTimeout(() => {
+        weekOffset += direction;
+        const monday = getMondayOfOffsetWeek(weekOffset);
+        activeDateKey = formatDateKey(monday);
+        renderWeekCalendar();
+        renderDashboard();
+        cal.style.transform = 'translateX(0)';
+        cal.style.opacity = '1';
+      }, 130);
+    }
+
+    function goToTodayWeek() {
+      weekOffset = 0;
+      activeDateKey = formatDateKey(new Date());
+      renderWeekCalendar();
+      renderDashboard();
+    }
+
+    function initCalendarSwipe() {
+      const card = document.getElementById('weekCalendarCard');
+      let startX = 0;
+      card.addEventListener('touchstart', (e) => {
+        startX = e.changedTouches[0].screenX;
+      }, { passive: true });
+      card.addEventListener('touchend', (e) => {
+        const diff = e.changedTouches[0].screenX - startX;
+        if (Math.abs(diff) > 45) {
+          shiftWeek(diff < 0 ? 1 : -1);
+        }
+      }, { passive: true });
+    }
+
+    function getCurrentDayData() {
+      if (!appState.days[activeDateKey]) {
+        appState.days[activeDateKey] = { foods: [], water: 0 };
+      }
+      return appState.days[activeDateKey];
+    }
+
+    function renderDashboard() {
+      const dayData = getCurrentDayData();
+      const goals = appState.goals;
+
+      let totalCal = 0, totalP = 0, totalF = 0, totalC = 0, totalFiber = 0;
+      dayData.foods.forEach(item => {
+        totalCal += Number(item.cal) || 0;
+        totalP += Number(item.p) || 0;
+        totalF += Number(item.f) || 0;
+        totalC += Number(item.c) || 0;
+        totalFiber += Number(item.fiber) || 0;
+      });
+
+      totalCal = Math.round(totalCal);
+      totalP = Math.round(totalP * 10) / 10;
+      totalF = Math.round(totalF * 10) / 10;
+      totalC = Math.round(totalC * 10) / 10;
+      totalFiber = Math.round(totalFiber * 10) / 10;
+
+      const maxArc = 278;
+      const ratio = Math.min(1, Math.max(0, totalCal / (goals.cal || 2000)));
+      const offset = maxArc - maxArc * ratio;
+      const arcEl = document.getElementById('calorieArc');
+      arcEl.style.strokeDashoffset = offset;
+
+      const remaining = goals.cal - totalCal;
+      const statusLabel = document.getElementById('calStatusLabel');
+      const remValue = document.getElementById('calRemainingValue');
+
+      if (remaining >= 0) {
+        statusLabel.textContent = 'Еще можно съесть';
+        remValue.textContent = remaining;
+        remValue.className = 'text-3xl font-extrabold text-[#1cc8a0] tracking-tight my-0.5';
+        arcEl.setAttribute('stroke', '#1cc8a0');
+      } else {
+        statusLabel.textContent = 'Превышение нормы';
+        remValue.textContent = `+${Math.abs(remaining)}`;
+        remValue.className = 'text-3xl font-extrabold text-rose-400 tracking-tight my-0.5';
+        arcEl.setAttribute('stroke', '#fb7185');
+      }
+
+      document.getElementById('calConsumedBadge').textContent = `${totalCal} / ${goals.cal} ккал`;
+
+      document.getElementById('proteinText').textContent = `${totalP} / ${goals.p}г`;
+      document.getElementById('proteinBar').style.width = `${Math.min(100, (totalP / (goals.p || 1)) * 100)}%`;
+
+      document.getElementById('fatText').textContent = `${totalF} / ${goals.f}г`;
+      document.getElementById('fatBar').style.width = `${Math.min(100, (totalF / (goals.f || 1)) * 100)}%`;
+
+      document.getElementById('carbsText').textContent = `${totalC} / ${goals.c}г`;
+      document.getElementById('carbsBar').style.width = `${Math.min(100, (totalC / (goals.c || 1)) * 100)}%`;
+
+      document.getElementById('fiberText').textContent = `${totalFiber} / ${goals.fiber}г`;
+      document.getElementById('fiberBar').style.width = `${Math.min(100, (totalFiber / (goals.fiber || 1)) * 100)}%`;
+
+      const waterMl = dayData.water || 0;
+      const waterPct = Math.min(100, Math.round((waterMl / (goals.water || 2000)) * 100));
+      document.getElementById('waterGoalLabel').textContent = `Цель: ${goals.water} мл`;
+      document.getElementById('waterCurrentText').textContent = `${waterMl} мл`;
+      document.getElementById('waterPercentText').textContent = `${waterPct}%`;
+      document.getElementById('waterProgressBar').style.width = `${waterPct}%`;
+
+      renderFoodList(dayData.foods);
+    }
+
+    function renderFoodList(foods) {
+      const container = document.getElementById('foodListContainer');
+      if (!foods || foods.length === 0) {
+        container.innerHTML = `
+          <div class="rounded-[22px] bg-white/60 dark:bg-[#19202a]/60 border border-dashed border-slate-300 dark:border-[#26303d] p-4 text-center text-xs text-slate-400">
+            За этот день пока нет записей. Используйте камеру, галерею или текстовое описание выше!
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = foods.map((item, idx) => {
+        const thumbHtml = item.image
+          ? `<img src="${item.image}" alt="${item.name}" class="w-12 h-12 rounded-2xl object-cover border border-emerald-500/30 shrink-0" />`
+          : `<div class="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center text-xl shrink-0">${item.icon || getFoodDefaultEmoji(item.name)}</div>`;
+
+        return `
+        <div onclick="openEditFoodModal(${idx})" class="rounded-[22px] bg-white dark:bg-[#19202a] border border-slate-200 dark:border-[#26303d] hover:border-[#1cc8a0] dark:hover:border-[#1cc8a0] p-3 flex items-center justify-between gap-3 shadow-sm cursor-pointer active:scale-[0.99] transition group">
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            ${thumbHtml}
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-extrabold truncate group-hover:text-[#1cc8a0] transition">${item.name}</span>
+                <span class="text-[11px] font-semibold text-slate-400 shrink-0">${item.weight || 100} г</span>
+              </div>
+              <div class="flex flex-wrap items-center gap-2 mt-1 text-[11px] font-semibold">
+                <span class="text-[#1cc8a0] font-extrabold">${Math.round(item.cal)} ккал</span>
+                <span class="text-rose-400">Б: ${item.p}г</span>
+                <span class="text-sky-400">Ж: ${item.f}г</span>
+                <span class="text-amber-400">У: ${item.c}г</span>
+                <span class="text-emerald-400">Кл: ${item.fiber || 0}г</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <span class="text-[11px] text-slate-400 group-hover:text-[#1cc8a0] px-1" title="Нажмите для редактирования">✎</span>
+            <button onclick="event.stopPropagation(); removeFoodEntry(${idx})" title="Удалить" class="w-8 h-8 rounded-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 flex items-center justify-center text-xs font-bold shrink-0">
+              ✕
+            </button>
+          </div>
+        </div>
+      `;
+      }).join('');
+    }
+
+    function removeFoodEntry(index) {
+      const dayData = getCurrentDayData();
+      dayData.foods.splice(index, 1);
+      saveState();
+      renderWeekCalendar();
+      renderDashboard();
+      showToast('Запись удалена');
+    }
+
+    function changeWater(deltaMl) {
+      const dayData = getCurrentDayData();
+      dayData.water = Math.max(0, (dayData.water || 0) + deltaMl);
+      saveState();
+      renderDashboard();
+    }
+
+    let baseFoodPer100g = null;
+    let editingFoodIndex = null;
+
+    function openHistoryModal() {
+      const modal = document.getElementById('historyModal');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      const searchInput = document.getElementById('historySearchInput');
+      if (searchInput) searchInput.value = '';
+      renderHistoryModalList();
+    }
+
+    function closeHistoryModal() {
+      const modal = document.getElementById('historyModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function renderHistoryModalList() {
+      const container = document.getElementById('historyListContainer');
+      if (!container) return;
+      const query = (document.getElementById('historySearchInput')?.value || '').trim().toLowerCase();
+      const filtered = (appState.history || []).filter(item => (item.name || '').toLowerCase().includes(query));
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="text-center py-6 text-xs text-slate-400">Ничего не найдено</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map((item, idx) => {
+        const thumb = item.image
+          ? `<img src="${item.image}" class="w-10 h-10 rounded-xl object-cover shrink-0 border border-emerald-500/30" />`
+          : `<div class="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center text-lg shrink-0">${item.icon || getFoodDefaultEmoji(item.name)}</div>`;
+
+        return `
+          <div onclick="addFoodFromHistory(${idx})" class="p-2.5 rounded-2xl bg-slate-100 dark:bg-[#11161d] hover:border-[#1cc8a0] border border-transparent flex items-center justify-between gap-2.5 cursor-pointer active:scale-[0.99] transition">
+            <div class="flex items-center gap-2.5 min-w-0">
+              ${thumb}
+              <div class="min-w-0">
+                <div class="text-xs font-extrabold truncate">${item.name}</div>
+                <div class="text-[10px] text-slate-400">${item.weight || 100} г • Б:${item.p} Ж:${item.f} У:${item.c} Кл:${item.fiber || 0}</div>
+              </div>
+            </div>
+            <span class="text-xs font-extrabold text-[#1cc8a0] shrink-0">+ ${Math.round(item.cal)} ккал</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function addFoodFromHistory(filteredIdx) {
+      const query = (document.getElementById('historySearchInput')?.value || '').trim().toLowerCase();
+      const filtered = (appState.history || []).filter(item => (item.name || '').toLowerCase().includes(query));
+      const selected = filtered[filteredIdx];
+      if (!selected) return;
+
+      const dayData = getCurrentDayData();
+      dayData.foods.unshift({
+        name: selected.name,
+        weight: Number(selected.weight) || 100,
+        cal: Math.round(Number(selected.cal) || 0),
+        p: Number(selected.p) || 0,
+        f: Number(selected.f) || 0,
+        c: Number(selected.c) || 0,
+        fiber: Number(selected.fiber) || 0,
+        icon: selected.icon || getFoodDefaultEmoji(selected.name),
+        image: selected.image || null,
+        timestamp: Date.now()
+      });
+
+      saveState();
+      renderWeekCalendar();
+      renderDashboard();
+      closeHistoryModal();
+      showToast(`✓ Добавлено: ${selected.name}`);
+    }
+
+    function openEditFoodModal(index) {
+      const dayData = getCurrentDayData();
+      const item = dayData.foods[index];
+      if (!item) return;
+
+      editingFoodIndex = index;
+      const w = Math.max(1, Number(item.weight) || 100);
+      document.getElementById('editFoodNameInput').value = item.name;
+      document.getElementById('editFoodWeightInput').value = w;
+      document.getElementById('editFoodCalInput').value = Math.round(Number(item.cal) || 0);
+      document.getElementById('editFoodProtInput').value = Number(item.p) || 0;
+      document.getElementById('editFoodFatInput').value = Number(item.f) || 0;
+      document.getElementById('editFoodCarbInput').value = Number(item.c) || 0;
+      document.getElementById('editFoodFiberInput').value = Number(item.fiber) || 0;
+
+      baseFoodPer100g = {
+        cal: ((Number(item.cal) || 0) / w) * 100,
+        p: ((Number(item.p) || 0) / w) * 100,
+        f: ((Number(item.f) || 0) / w) * 100,
+        c: ((Number(item.c) || 0) / w) * 100,
+        fiber: ((Number(item.fiber) || 0) / w) * 100
+      };
+
+      document.getElementById('editFoodModal').classList.remove('hidden');
+    }
+
+    function closeEditFoodModal() {
+      editingFoodIndex = null;
+      document.getElementById('editFoodModal').classList.add('hidden');
+    }
+
+    function scaleEditMacrosByWeight() {
+      if (!baseFoodPer100g) return;
+      const w = Math.max(1, Number(document.getElementById('editFoodWeightInput').value) || 100);
+      const factor = w / 100;
+      const p = Math.round(baseFoodPer100g.p * factor * 10) / 10;
+      const f = Math.round(baseFoodPer100g.f * factor * 10) / 10;
+      const c = Math.round(baseFoodPer100g.c * factor * 10) / 10;
+      const fiber = Math.round(baseFoodPer100g.fiber * factor * 10) / 10;
+
+      document.getElementById('editFoodProtInput').value = p;
+      document.getElementById('editFoodFatInput').value = f;
+      document.getElementById('editFoodCarbInput').value = c;
+      document.getElementById('editFoodFiberInput').value = fiber;
+
+      const calcCal = Math.round(p * 4 + f * 9 + c * 4);
+      document.getElementById('editFoodCalInput').value = calcCal > 0 ? calcCal : Math.round(baseFoodPer100g.cal * factor);
+    }
+
+    function recalcCaloriesFromMacros() {
+      const p = Number(document.getElementById('editFoodProtInput').value) || 0;
+      const f = Number(document.getElementById('editFoodFatInput').value) || 0;
+      const c = Number(document.getElementById('editFoodCarbInput').value) || 0;
+      const w = Math.max(1, Number(document.getElementById('editFoodWeightInput').value) || 100);
+      const cal = Math.round(p * 4 + f * 9 + c * 4);
+      document.getElementById('editFoodCalInput').value = cal;
+
+      baseFoodPer100g = {
+        cal: (cal / w) * 100,
+        p: (p / w) * 100,
+        f: (f / w) * 100,
+        c: (c / w) * 100,
+        fiber: ((Number(document.getElementById('editFoodFiberInput').value) || 0) / w) * 100
+      };
+    }
+
+    function saveEditedFoodEntry() {
+      const dayData = getCurrentDayData();
+      if (editingFoodIndex === null || !dayData.foods[editingFoodIndex]) return;
+
+      const name = (document.getElementById('editFoodNameInput').value || '').trim() || 'Приём пищи';
+      const weight = Math.max(1, Number(document.getElementById('editFoodWeightInput').value) || 100);
+      const cal = Math.max(0, Math.round(Number(document.getElementById('editFoodCalInput').value) || 0));
+      const p = Math.max(0, Math.round((Number(document.getElementById('editFoodProtInput').value) || 0) * 10) / 10);
+      const f = Math.max(0, Math.round((Number(document.getElementById('editFoodFatInput').value) || 0) * 10) / 10);
+      const c = Math.max(0, Math.round((Number(document.getElementById('editFoodCarbInput').value) || 0) * 10) / 10);
+      const fiber = Math.max(0, Math.round((Number(document.getElementById('editFoodFiberInput').value) || 0) * 10) / 10);
+
+      dayData.foods[editingFoodIndex] = {
+        ...dayData.foods[editingFoodIndex],
+        name, weight, cal, p, f, c, fiber, icon: getFoodDefaultEmoji(name)
+      };
+
+      saveState();
+      renderDashboard();
+      closeEditFoodModal();
+      showToast('Изменения сохранены!');
+    }
+
+    function triggerDirectCamera() {
+      document.getElementById('directCameraInput').click();
+    }
+
+    function triggerDirectGallery() {
+      document.getElementById('directGalleryInput').click();
+    }
+
+    function toggleManualTextField() {
+      const card = document.getElementById('manualTextPromptCard');
+      card.classList.toggle('hidden');
+      if (!card.classList.contains('hidden')) {
+        document.getElementById('aiTextPromptInput').focus();
+      }
+    }
+
+    function compressImageFile(file, maxDim = 1280, quality = 0.86) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            let width = img.width;
+            let height = img.height;
+            if (width > maxDim || height > maxDim) {
+              if (width > height) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              } else {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          };
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function createSmallThumb(dataUrl, maxDim = 160, quality = 0.7) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = () => resolve(null);
+        img.src = dataUrl;
+      });
+    }
+
+    function setAiProcessingState(isLoading, message = 'ИИ анализирует...') {
+      const banner = document.getElementById('aiProcessingBanner');
+      const textEl = document.getElementById('aiProcessingText');
+      if (!banner || !textEl) return;
+      if (isLoading) {
+        textEl.textContent = message;
+        banner.classList.remove('hidden');
+      } else {
+        banner.classList.add('hidden');
+      }
+    }
+
+    function extractJsonFromAiText(rawText) {
+      if (!rawText || typeof rawText !== 'string') return null;
+      const cleaned = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+      try {
+        return JSON.parse(cleaned);
+      } catch (_) {
+        const match = cleaned.match(/\{[\s\S]*\}/);
+        if (match) {
+          try {
+            return JSON.parse(match[0]);
+          } catch (e2) {
+            console.warn('JSON inner parse failed:', e2);
+          }
+        }
+      }
+      return null;
+    }
+
+    // Если поднимете свой прокси (см. инструкцию) — впишите сюда адрес, например 'https://ai.mydomain.com'
+    // Пустая строка = прямое обращение к Google (нужен VPN из России)
+    const GEMINI_BASE_URL = '';
+    // Бесплатный релей через Google Apps Script: вставьте сюда адрес веб-приложения (https://script.google.com/macros/s/.../exec)
+    const GEMINI_RELAY_URL = '';
+
+    async function relayRequest(model, key, body) {
+      const r = await fetchWithTimeout(GEMINI_RELAY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ model, key, payload: body })
+      }, 35000);
+      const d = await r.json();
+      return {
+        ok: d.status >= 200 && d.status < 300,
+        status: d.status,
+        json: async () => JSON.parse(d.body),
+        text: async () => d.body || ''
+      };
+    }
+
+    function aiError(code, msg) { const e = new Error(code); e.userMessage = msg; e.code = code; return e; }
+
+    async function fetchWithTimeout(url, opts, ms) {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), ms);
+      try { return await fetch(url, { ...opts, signal: ctrl.signal }); }
+      finally { clearTimeout(t); }
+    }
+
+    async function callGeminiAI(payloadData) {
+      const userKey = (appState.geminiKey || '').trim();
+      if (!userKey && !GEMINI_BASE_URL && !GEMINI_RELAY_URL) {
+        throw aiError('NO_KEY', '🔑 Сначала добавьте ключ ИИ.');
+      }
+      const base = GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com';
+      const models = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3-flash-preview', 'gemini-2.5-flash'];
+      const headers = { 'Content-Type': 'application/json' };
+      if (userKey) headers['x-goog-api-key'] = userKey; // ключ в заголовке, а не в URL
+      const body = JSON.stringify(payloadData);
+
+      const RETRY_STATUS = [408, 429, 500, 502, 503, 504];
+      const deadline = Date.now() + 75000; // общий лимит на всё распознавание
+      let lastError = null;
+
+      for (const modelName of models) {
+        const url = `${base}/v1beta/models/${modelName}:generateContent`;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          if (Date.now() > deadline) break;
+          try {
+            const resp = GEMINI_RELAY_URL ? await relayRequest(modelName, userKey, body) : await fetchWithTimeout(url, { method: 'POST', headers, body }, 25000);
+            if (resp.ok) {
+              const json = await resp.json();
+              const parts = json?.candidates?.[0]?.content?.parts || [];
+              const rawText = parts.map(p => p.text || '').join('\n').trim();
+              const parsed = extractJsonFromAiText(rawText);
+              if (parsed && typeof parsed === 'object') return parsed;
+              lastError = aiError('BAD_JSON', '⚠️ ИИ ответил в неверном формате, пробуем ещё раз…');
+              continue;
+            }
+            const errText = await resp.text().catch(() => '');
+            if (resp.status === 400 && /API key|API_KEY/i.test(errText) || resp.status === 401 || resp.status === 403) {
+              if (/location is not supported/i.test(errText)) {
+                throw aiError('GEO', '🌍 Google не принимает запросы из вашего региона. Нужен VPN или прокси.');
+              }
+              throw aiError('AUTH', '🔑 Ключ ИИ не принят. Проверьте его.');
+            }
+            if (resp.status === 404) { console.warn('Gemini model 404:', modelName, errText.slice(0, 200)); lastError = aiError('NOMODEL', 'Модель ИИ устарела или недоступна. Нужно обновить приложение.'); break; } // следующая модель
+            if (RETRY_STATUS.includes(resp.status)) {
+              lastError = aiError('HTTP_' + resp.status, resp.status === 429
+                ? '⏳ Превышен лимит запросов ключа. Подождите минуту.'
+                : '⚠️ Сервер ИИ перегружен, повторяем…');
+              await new Promise(r => setTimeout(r, 800 * Math.pow(2, attempt)));
+              continue;
+            }
+            lastError = aiError('HTTP_' + resp.status, `⚠️ Ошибка ИИ (${resp.status}).`);
+            break;
+          } catch (e) {
+            if (e.code === 'AUTH' || e.code === 'GEO') throw e;
+            lastError = (e && e.code) ? e : aiError('NET', '📡 Нет стабильного соединения с ИИ. Проверьте интернет/VPN.');
+            await new Promise(r => setTimeout(r, 800 * Math.pow(2, attempt)));
+          }
+        }
+      }
+      throw lastError || aiError('UNKNOWN', 'Не удалось получить ответ от ИИ');
+    }
+
+    async function handleImageFileSelected(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      event.target.value = '';
+
+      setAiProcessingState(true, '📸 ИИ внимательно изучает фото (блюдо / этикетку)...');
+      showToast('📸 Отправляем фото в Gemini AI...');
+
+      try {
+        const highResDataUrl = await compressImageFile(file, 1024, 0.75);
+        const base64Data = highResDataUrl.split(',')[1];
+        const thumbDataUrl = await createSmallThumb(highResDataUrl, 160, 0.72);
+
+        const visionPrompt = `Ты профессиональный диетолог и эксперт по пищевым продуктам. Внимательно изучи это изображение.
+ВАРИАНТ 1: Если на фото ЭТИКЕТКА, УПАКОВКА или ТАБЛИЦА КБЖУ:
+- Прочитай точное название продукта/бренда с упаковки (если названия не видно, напиши точный тип продукта по составу, но НИКОГДА не пиши абстрактное "Продукт с этикетки").
+- Найди в таблице пищевой ценности точные цифры Белков, Жиров, Углеводов и Калорий (ккал) на 100 г.
+- Если на упаковке указана масса нетто / вес порции (например, 180 г, 250 г, 330 мл), укажи этот вес в поле weight и пересчитай КБЖУ на всю упаковку/порцию, либо если вес не виден — укажи weight: 100 и точные КБЖУ на 100 г.
+
+ВАРИАНТ 2: Если на фото ГОТОВОЕ БЛЮДО, ЕДА или НАПИТОК:
+- Точно определи, какое именно это блюдо (например: "Шаурма с курицей", "Борщ со сметаной", "Жареная картошка с котлетой").
+- Оцени реальный вес порции в граммах по размеру на фото и рассчитай достоверные КБЖУ для всей этой порции.
+
+Верни ответ СТРОГО в формате чистого JSON (числами, на русском языке):
+{"name":"Точное название блюда или продукта","weight":число_грамм,"cal":число_ккал,"p":число_белков,"f":число_жиров,"c":число_углеводов,"fiber":число_клетчатки}`;
+
+        const parsed = await callGeminiAI({
+          contents: [{
+            role: 'user',
+            parts: [
+              { text: visionPrompt },
+              { inlineData: { mimeType: 'image/jpeg', data: base64Data } }
+            ]
+          }],
+          generationConfig: {
+            temperature: 0.15,
+            responseMimeType: "application/json"
+          }
+        });
+
+        const name = (parsed.name && String(parsed.name).trim()) || 'Распознанное блюдо';
+        const weight = Math.max(1, Math.round(Number(parsed.weight) || 100));
+        const p = Math.max(0, Math.round((Number(parsed.p) || 0) * 10) / 10);
+        const f = Math.max(0, Math.round((Number(parsed.f) || 0) * 10) / 10);
+        const c = Math.max(0, Math.round((Number(parsed.c) || 0) * 10) / 10);
+        const fiber = Math.max(0, Math.round((Number(parsed.fiber) || 0) * 10) / 10);
+        let cal = Math.max(0, Math.round(Number(parsed.cal) || 0));
+        if (!cal && (p || f || c)) {
+          cal = Math.round(p * 4 + f * 9 + c * 4);
+        }
+
+        const icon = getFoodDefaultEmoji(name);
+        const dayData = getCurrentDayData();
+        dayData.foods.unshift({ name, weight, cal, p, f, c, fiber, icon, image: thumbDataUrl, timestamp: Date.now() });
+
+        appState.history.unshift({ name, weight, cal, p, f, c, fiber, icon, image: thumbDataUrl, timestamp: Date.now() });
+        if (appState.history.length > 30) appState.history.pop();
+
+        saveState();
+        renderWeekCalendar();
+        renderDashboard();
+        showToast(`✓ Распознано: ${name} (${cal} ккал)`);
+      } catch (err) {
+        console.error('AI Photo Recognition error:', err);
+        showToast(err.userMessage || '⚠️ ИИ временно недоступен. Повторите через несколько секунд.');
+        if (err && (err.code === 'NO_KEY' || err.code === 'AUTH')) openKeyModal();
+      } finally {
+        setAiProcessingState(false);
+      }
+    }
+
+    async function submitTextPromptToAI() {
+      const promptInput = document.getElementById('aiTextPromptInput');
+      const submitBtn = document.getElementById('submitTextAiBtn');
+      const text = (promptInput?.value || '').trim();
+      if (!text) {
+        showToast('Пожалуйста, напишите, что вы съели');
+        return;
+      }
+
+      setAiProcessingState(true, '🤖 ИИ рассчитывает КБЖУ по вашему описанию...');
+      if (submitBtn) submitBtn.disabled = true;
+      showToast('🤖 ИИ анализирует описание...');
+
+      try {
+        const promptText = `Ты профессиональный нутрициолог. Пользователь описал свой приём пищи: "${text}".
+Точно определи все продукты и их количество/вес из описания (если вес не указан явно, возьми стандартный вес указанных штук/порций, например 1 банка сгущенки = 380 г, 1 мишка Барни = 30 г, 2 пряника = 100 г и т.д.).
+Рассчитай суммарный реальный вес в граммах и точные суммарные показатели КБЖУ (калории, белки, жиры, углеводы, клетчатка) на весь описанный объём.
+Верни СТРОГО чистый JSON без пояснений:
+{"name":"Краткое понятное название на русском","weight":суммарный_вес_числом,"cal":ккал_числом,"p":белки_числом,"f":жиры_числом,"c":углеводы_числом,"fiber":клетчатка_числом}`;
+
+        const parsed = await callGeminiAI({
+          contents: [{
+            role: 'user',
+            parts: [{ text: promptText }]
+          }],
+          generationConfig: {
+            temperature: 0.15,
+            responseMimeType: "application/json"
+          }
+        });
+
+        const name = (parsed.name && String(parsed.name).trim()) || text;
+        const weight = Math.max(1, Math.round(Number(parsed.weight) || 100));
+        const p = Math.max(0, Math.round((Number(parsed.p) || 0) * 10) / 10);
+        const f = Math.max(0, Math.round((Number(parsed.f) || 0) * 10) / 10);
+        const c = Math.max(0, Math.round((Number(parsed.c) || 0) * 10) / 10);
+        const fiber = Math.max(0, Math.round((Number(parsed.fiber) || 0) * 10) / 10);
+        let cal = Math.max(0, Math.round(Number(parsed.cal) || 0));
+        if (!cal && (p || f || c)) {
+          cal = Math.round(p * 4 + f * 9 + c * 4);
+        }
+
+        const icon = getFoodDefaultEmoji(name);
+        const dayData = getCurrentDayData();
+        dayData.foods.unshift({ name, weight, cal, p, f, c, fiber, icon, image: null, timestamp: Date.now() });
+
+        appState.history.unshift({ name, weight, cal, p, f, c, fiber, icon, image: null });
+        if (appState.history.length > 30) appState.history.pop();
+
+        promptInput.value = '';
+        document.getElementById('manualTextPromptCard').classList.add('hidden');
+        saveState();
+        renderWeekCalendar();
+        renderDashboard();
+        showToast(`✓ Добавлено: ${name} (${cal} ккал)`);
+      } catch (err) {
+        console.error('AI Text error:', err);
+        showToast(err.userMessage || '⚠️ Не удалось связаться с ИИ. Повторите через несколько секунд.');
+        if (err && (err.code === 'NO_KEY' || err.code === 'AUTH')) openKeyModal();
+      } finally {
+        setAiProcessingState(false);
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    }
+
+    function hasAiKey() {
+      return !!(appState.geminiKey && appState.geminiKey.trim().length > 10);
+    }
+
+    function updateAiBadge() {
+      const badge = document.getElementById('aiBadgeHeader');
+      if (!badge) return;
+      const base = 'cursor-pointer whitespace-nowrap text-[10px] font-bold px-2 py-0.5 rounded-full border ';
+      if (hasAiKey()) {
+        badge.textContent = 'ИИ подключён';
+        badge.className = base + 'bg-emerald-500/15 text-[#1cc8a0] border-emerald-500/30';
+      } else {
+        badge.textContent = 'Добавьте ключ ИИ';
+        badge.className = base + 'bg-slate-500/15 text-slate-400 border-slate-500/30';
+      }
+    }
+
+    function openKeyModal() {
+      document.getElementById('keyModal').classList.remove('hidden');
+      const input = document.getElementById('geminiKeyInput');
+      input.value = appState.geminiKey || '';
+      input.type = 'password';
+      document.getElementById('keyEyeBtn').textContent = '👁';
+      document.getElementById('keyHelpBox').classList.toggle('hidden', hasAiKey());
+      document.getElementById('keyDeleteBtn').classList.toggle('hidden', !hasAiKey());
+    }
+
+    function closeKeyModal() {
+      document.getElementById('keyModal').classList.add('hidden');
+    }
+
+    function toggleKeyHelp() {
+      document.getElementById('keyHelpBox').classList.toggle('hidden');
+    }
+
+    function toggleKeyVisibility() {
+      const input = document.getElementById('geminiKeyInput');
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      document.getElementById('keyEyeBtn').textContent = show ? '🙈' : '👁';
+    }
+
+    function saveGeminiKey() {
+      const val = (document.getElementById('geminiKeyInput').value || '').trim();
+      if (val.length < 20) {
+        showToast('⚠️ Ключ слишком короткий. Скопируйте его целиком.');
+        return;
+      }
+      if (/\s/.test(val)) {
+        showToast('⚠️ В ключе не должно быть пробелов.');
+        return;
+      }
+      appState.geminiKey = val;
+      saveState();
+      updateAiBadge();
+      closeKeyModal();
+      showToast('✓ Ключ сохранён, ИИ подключён');
+    }
+
+    function deleteGeminiKey() {
+      appState.geminiKey = '';
+      saveState();
+      updateAiBadge();
+      closeKeyModal();
+      showToast('Ключ удалён');
+    }
+
+    function applyTheme() {
+      const html = document.documentElement;
+      const label = document.getElementById('themeToggleLabel');
+      if (appState.theme === 'light') {
+        html.classList.remove('dark');
+        if (label) label.textContent = 'Светлая тема';
+      } else {
+        html.classList.add('dark');
+        if (label) label.textContent = 'Тёмная тема';
+      }
+    }
+
+    function toggleTheme() {
+      appState.theme = appState.theme === 'dark' ? 'light' : 'dark';
+      applyTheme();
+      saveState();
+    }
+
+    const WHEEL_ITEM_HEIGHT = 44;
+
+    function buildWheel(containerId, minVal, maxVal, currentVal, onChangeCallback) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      container.innerHTML = '';
+
+      for (let v = minVal; v <= maxVal; v++) {
+        const item = document.createElement('div');
+        item.className = 'wheel-item' + (v === currentVal ? ' active' : '');
+        item.dataset.val = v;
+        item.textContent = v;
+        item.onclick = () => {
+          const targetIdx = v - minVal;
+          container.scrollTo({ top: targetIdx * WHEEL_ITEM_HEIGHT, behavior: 'smooth' });
+        };
+        container.appendChild(item);
+      }
+
+      const initialIndex = Math.max(0, Math.min(maxVal - minVal, currentVal - minVal));
+      setTimeout(() => {
+        container.scrollTop = initialIndex * WHEEL_ITEM_HEIGHT;
+      }, 20);
+
+      let scrollTimer = null;
+      container.onscroll = () => {
+        const idx = Math.round(container.scrollTop / WHEEL_ITEM_HEIGHT);
+        const clampedIdx = Math.max(0, Math.min(maxVal - minVal, idx));
+        const selectedVal = minVal + clampedIdx;
+
+        const children = container.children;
+        for (let i = 0; i < children.length; i++) {
+          if (i === clampedIdx) children[i].classList.add('active');
+          else children[i].classList.remove('active');
+        }
+
+        clearTimeout(scrollTimer);
+        scrollTimer = setTimeout(() => {
+          onChangeCallback(selectedVal);
+        }, 60);
+      };
+    }
+
+    function setGender(gender) {
+      appState.profile.gender = gender;
+      const maleBtn = document.getElementById('genderMaleBtn');
+      const femaleBtn = document.getElementById('genderFemaleBtn');
+      if (gender === 'male') {
+        maleBtn.className = 'flex-1 py-2 rounded-xl transition mint-gradient text-white shadow-sm';
+        femaleBtn.className = 'flex-1 py-2 rounded-xl transition text-slate-500 dark:text-slate-400';
+      } else {
+        femaleBtn.className = 'flex-1 py-2 rounded-xl transition mint-gradient text-white shadow-sm';
+        maleBtn.className = 'flex-1 py-2 rounded-xl transition text-slate-500 dark:text-slate-400';
+      }
+      recalculateRecommendedGoals();
+    }
+
+    function recalculateRecommendedGoals() {
+      const { gender, height, weight, age } = appState.profile;
+      const activity = parseFloat(document.getElementById('activitySelect')?.value || appState.profile.activity || 1.55);
+      const goalMod = parseFloat(document.getElementById('goalModeSelect')?.value || appState.profile.goalMod || 0);
+
+      appState.profile.activity = activity;
+      appState.profile.goalMod = goalMod;
+
+      const baseBmr = 10 * weight + 6.25 * height - 5 * age + (gender === 'male' ? 5 : -161);
+      const tdee = baseBmr * activity;
+      const targetCal = Math.max(1200, Math.round(tdee * (1 + goalMod)));
+
+      const targetP = Math.round((targetCal * 0.25) / 4);
+      const targetF = Math.round((targetCal * 0.25) / 9);
+      const targetC = Math.round((targetCal * 0.50) / 4);
+      const targetWater = Math.round((weight * 32) / 50) * 50;
+
+      document.getElementById('goalCalInput').value = targetCal;
+      document.getElementById('goalProtInput').value = targetP;
+      document.getElementById('goalFatInput').value = targetF;
+      document.getElementById('goalCarbInput').value = targetC;
+      document.getElementById('goalWaterInput').value = targetWater;
+    }
+
+    function openSettingsModal() {
+      const modal = document.getElementById('settingsModal');
+      modal.classList.remove('hidden');
+
+      setGender(appState.profile.gender || 'male');
+      document.getElementById('activitySelect').value = String(appState.profile.activity || 1.55);
+      document.getElementById('goalModeSelect').value = String(appState.profile.goalMod || 0);
+
+      document.getElementById('goalCalInput').value = appState.goals.cal;
+      document.getElementById('goalProtInput').value = appState.goals.p;
+      document.getElementById('goalFatInput').value = appState.goals.f;
+      document.getElementById('goalCarbInput').value = appState.goals.c;
+      document.getElementById('goalWaterInput').value = appState.goals.water;
+
+      buildWheel('wheelHeight', 130, 220, appState.profile.height, (val) => {
+        appState.profile.height = val;
+        recalculateRecommendedGoals();
+      });
+      buildWheel('wheelWeight', 35, 160, appState.profile.weight, (val) => {
+        appState.profile.weight = val;
+        recalculateRecommendedGoals();
+      });
+      buildWheel('wheelAge', 12, 90, appState.profile.age, (val) => {
+        appState.profile.age = val;
+        recalculateRecommendedGoals();
+      });
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('settingsModal').classList.add('hidden');
+    }
+
+    function saveSettings() {
+      appState.goals.cal = Math.max(800, Number(document.getElementById('goalCalInput').value) || 2000);
+      appState.goals.p = Math.max(20, Number(document.getElementById('goalProtInput').value) || 120);
+      appState.goals.f = Math.max(20, Number(document.getElementById('goalFatInput').value) || 60);
+      appState.goals.c = Math.max(20, Number(document.getElementById('goalCarbInput').value) || 220);
+      appState.goals.fiber = Math.max(15, Math.round((appState.goals.cal / 1000) * 14));
+      appState.goals.water = Math.max(500, Number(document.getElementById('goalWaterInput').value) || 2000);
+
+      saveState();
+      updateAiBadge();
+      renderDashboard();
+      closeSettingsModal();
+      showToast('Настройки сохранены!');
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadState();
+      initCalendarSwipe();
+      renderWeekCalendar();
+      renderDashboard();
+    });
+  </script>
+</body>
+</html>
